@@ -7,11 +7,18 @@ Here every file is a different algo and hence every file have different features
 
 Installation
 1. clone the repo
-2. install dependencies(as per the requirement.txt).
+2. install dependencies.
 3. setup credentials.
 
 Usage:-
 So far it is designed to work for BTC only, if you want to run it on another crypto then change it or make a array for multiple crypto.
+
+Requirements
+1. python
+2. panda
+3. numpy
+4. ccxt
+5. ta-lib
 
 Disclaimer
 
