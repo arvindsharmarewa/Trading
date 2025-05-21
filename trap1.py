@@ -5,25 +5,33 @@ import time
 import hmac
 import hashlib
 import json
-import ccxt
 from dotenv import load_dotenv
 import os
 from datetime import datetime
+from delta_rest_client import DeltaRestClient
+from enum import Enum
 
 load_dotenv()
 # Constants for trading
 BASE_URL = "https://api.india.delta.exchange"
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
-SYMBOL = "BTCUSDT"
+SYMBOL = 'BTC/USDT'
+PRODUCT_ID = 27
 TIMEFRAME = "15m"
 RISK_PER_TRADE = 0.005
 today_date = datetime.now().strftime("%Y-%m-%d")
 filename = f"signals_output_{today_date}.csv"
-exchange = ccxt.delta({
-    'apiKey': API_KEY,
-    'secret': API_SECRET,
-})
+
+delta_client = DeltaRestClient(
+  base_url= BASE_URL,
+  api_key= API_KEY,
+  api_secret= API_SECRET,
+)
+
+class OrderType(Enum):
+    MARKET = "market_order"
+    LIMIT = "limit_order"
 
 # Mock balance for demonstration
 balance = 1000  # Starting balance in USD
@@ -36,7 +44,7 @@ def identify_key_levels(df, window=25):
 
 
 # Fetch candlestick data
-# def fetch_candlestick_data(symbol, interval="15m", limit=100):
+def fetch_candlestick_data(symbol, interval="15m", limit=100):
     url = f"{BASE_URL}/v2/ohlc/{symbol}/candles"
     params = {"resolution": interval, "limit": limit}
     response = requests.get(url, params=params)
@@ -74,25 +82,14 @@ def generate_signature(api_secret, request_path, body=""):
 
 
 # Place an order
-def place_order(symbol, side, quantity, price=None, order_type="market"):
+def place_order(symbol, product_id, side, quantity, price=None, order_type=OrderType.MARKET):
     try:
-        # order = client.place_order(
-        #     product_id=symbol,
-        #     size=quantity,
-        #     side=side,
-        #     type=order_type,
-        #     limit_price=price,
-        # )
-        if order_type == "market":
-            # Place market order
-            order = exchange.create_market_order(symbol, side, quantity)
-        elif order_type == "limit" and price is not None:
-            # Place limit order
-            order = exchange.create_limit_order(symbol, side, quantity, price)
-        else:
-            print("Invalid order type or missing price for limit order.")
-            return None
-
+        order = delta_client.place_order(
+            product_id = product_id,
+            size = 2,
+            side = side,
+            order_type= order_type,
+        )
         print(f"Order placed successfully: {order}")
         return order
     except Exception as e:
@@ -161,7 +158,7 @@ def handle_trade(signal, last_close, last_swing, RISK_PER_TRADE=0.005):
     if new_side:
         # Close opposite position if any
         if current_position["side"] and current_position["side"] != new_side:
-            place_order(SYMBOL, "close", current_position["size"])
+            place_order(SYMBOL, PRODUCT_ID, "close", current_position["size"])
             current_position = {"side": None, "size": 0, "entry_price": 0, "target_price": 0, "partial_booked": False}
 
         # Calculate trade parameters
@@ -173,7 +170,7 @@ def handle_trade(signal, last_close, last_swing, RISK_PER_TRADE=0.005):
         second_target = last_swing
 
         # Place trade
-        place_order(SYMBOL, new_side, trade_size)
+        place_order(SYMBOL, PRODUCT_ID, new_side, trade_size)
 
         current_position = {
             "side": new_side,
